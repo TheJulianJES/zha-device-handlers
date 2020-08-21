@@ -4,6 +4,7 @@ import logging
 import zigpy.types as t
 from zigpy.quirks import CustomCluster
 from zigpy.zcl.clusters.general import Scenes
+from zigpy.zcl.clusters.lighting import Color
 from zigpy.zcl.clusters.lightlink import LightLink
 
 _LOGGER = logging.getLogger(__name__)
@@ -42,3 +43,55 @@ class ScenesCluster(CustomCluster, Scenes):
         0x0008: ("hold", (t.int16s, t.int8s), False),
         0x0009: ("release", (t.int16s,), False),
     }
+
+
+class ColorTemperatureCluster(CustomCluster, Color):
+    """Ikea Color Temperature cluster."""
+
+    cluster_id = Color.cluster_id
+
+    CURRENT_X_ID = 0x0003
+    CURRENT_Y_ID = 0x0004
+    COLOR_TEMPERATURE_ID = 0x0007
+
+    # _CONSTANT_ATTRIBUTES = {COLOR_TEMPERATURE_ID: 162, 0x400a: 'bitmap16.16|8|4|2|1'}
+
+    # manufacturer_attributes = {0x0007: ("color_temperature", t.uint16_t)}
+
+    # def __init__(self, *args, **kwargs):
+    #     """Init."""
+    #     super().__init__(*args, **kwargs)
+    #     # self.endpoint.device.color_temperature_bus.add_listener(self)
+
+    def _update_attribute(self, attrid, value):
+        _LOGGER.debug(
+            "update_attribute IKEA: id: " + str(attrid) + " value: " + str(value)
+        )
+
+        if attrid == self.CURRENT_X_ID:
+            super()._update_attribute(self.COLOR_TEMPERATURE_ID, 155)
+
+        if attrid == self.CURRENT_Y_ID:
+            super()._update_attribute(self.COLOR_TEMPERATURE_ID, 154)
+
+        if attrid == self.COLOR_TEMPERATURE_ID:
+            value = 153
+            print("updating ikea attribute color temperature to 153")
+
+        super()._update_attribute(attrid, value)
+        # if value is not None and value >= 0:
+        #     _LOGGER.debug("updating ikea attribute color temperature to 153")
+        #     super()._update_attribute(self.COLOR_TEMPERATURE_ID, 153)
+        # self.endpoint.device.color_temperature_bus.listener_event(
+        #     "color_temperature_reported", 153 # value
+        # )
+
+    async def read_attributes_raw(self, attributes, manufacturer=None):
+        if self.COLOR_TEMPERATURE_ID in attributes:
+            self._update_attribute(self.COLOR_TEMPERATURE_ID, 156)
+        read = await super().read_attributes_raw(attributes, manufacturer)
+        return read
+
+    # def color_temperature_reported(self, value):
+    #     """Color temperature reported."""
+    #     self._update_attribute(self.COLOR_TEMPERATURE_ID, value)
