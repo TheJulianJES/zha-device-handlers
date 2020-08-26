@@ -6,6 +6,7 @@ from zigpy.quirks import CustomCluster
 from zigpy.zcl.clusters.general import Scenes
 from zigpy.zcl.clusters.lighting import Color
 from zigpy.zcl.clusters.lightlink import LightLink
+from zigpy.zcl.foundation import ReadAttributeRecord
 
 _LOGGER = logging.getLogger(__name__)
 IKEA = "IKEA of Sweden"
@@ -53,8 +54,12 @@ class ColorTemperatureCluster(CustomCluster, Color):
     CURRENT_X_ID = 0x0003
     CURRENT_Y_ID = 0x0004
     COLOR_TEMPERATURE_ID = 0x0007
+    COLOR_CAPABILITIES_ID = 0x400A
 
-    # _CONSTANT_ATTRIBUTES = {COLOR_TEMPERATURE_ID: 162, 0x400a: 'bitmap16.16|8|4|2|1'}
+    _CONSTANT_ATTRIBUTES = {
+        # COLOR_TEMPERATURE_ID: 300,
+        COLOR_CAPABILITIES_ID: t.bitmap16(0x001F),
+    }
 
     # manufacturer_attributes = {0x0007: ("color_temperature", t.uint16_t)}
 
@@ -69,14 +74,14 @@ class ColorTemperatureCluster(CustomCluster, Color):
         )
 
         if attrid == self.CURRENT_X_ID:
-            super()._update_attribute(self.COLOR_TEMPERATURE_ID, 155)
+            super()._update_attribute(self.COLOR_TEMPERATURE_ID, 301)
 
         if attrid == self.CURRENT_Y_ID:
-            super()._update_attribute(self.COLOR_TEMPERATURE_ID, 154)
+            super()._update_attribute(self.COLOR_TEMPERATURE_ID, 302)
 
         if attrid == self.COLOR_TEMPERATURE_ID:
-            value = 153
-            print("updating ikea attribute color temperature to 153")
+            value = 303
+            _LOGGER.debug("updating ikea attribute color temperature to 303")
 
         super()._update_attribute(attrid, value)
         # if value is not None and value >= 0:
@@ -87,9 +92,24 @@ class ColorTemperatureCluster(CustomCluster, Color):
         # )
 
     async def read_attributes_raw(self, attributes, manufacturer=None):
+        _LOGGER.debug("Reading attributes IKEA: " + str(attributes))
+
         if self.COLOR_TEMPERATURE_ID in attributes:
-            self._update_attribute(self.COLOR_TEMPERATURE_ID, 156)
+            self._update_attribute(self.COLOR_TEMPERATURE_ID, 304)
         read = await super().read_attributes_raw(attributes, manufacturer)
+
+        _LOGGER.debug(
+            "Reading attributes IKEA returnt type:"
+            + str(type(read))
+            + " and returning: "
+            + str(read)
+        )
+        for var in read:
+            _LOGGER.debug(str(type(var)))
+            _LOGGER.debug(str(var))
+            # if isinstance(var, ReadAttributeRecord):
+            #     _LOGGER.debug(var.value)
+
         return read
 
     # def color_temperature_reported(self, value):

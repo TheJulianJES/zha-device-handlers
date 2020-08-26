@@ -16,7 +16,6 @@ from zigpy.zcl.clusters.lighting import Color
 from zigpy.zcl.clusters.lightlink import LightLink
 
 from . import IKEA, ColorTemperatureCluster
-from .. import Bus
 from ..const import (
     ENDPOINTS,
     MODELS_INFO,
