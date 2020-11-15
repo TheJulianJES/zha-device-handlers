@@ -111,6 +111,12 @@ class Plug(XiaomiCustomDevice):
                 INPUT_CLUSTERS: [AnalogInputCluster],
                 OUTPUT_CLUSTERS: [AnalogInput.cluster_id, Groups.cluster_id],
             },
+            22: {
+                PROFILE_ID: zha.PROFILE_ID,
+                DEVICE_TYPE: zha.DeviceType.MAIN_POWER_OUTLET,
+                INPUT_CLUSTERS: [AnalogInputCluster],
+                OUTPUT_CLUSTERS: [AnalogInput.cluster_id, Groups.cluster_id],
+            },
             242: {
                 PROFILE_ID: XIAOMI_PROFILE_ID,
                 DEVICE_TYPE: XIAOMI_DEVICE_TYPE,
