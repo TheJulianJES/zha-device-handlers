@@ -28,7 +28,7 @@ class ZHADimmableLight(CustomDevice):
     """Philips ZigBee HomeAutomation dimmable bulb device."""
 
     signature = {
-        MODELS_INFO: [(PHILIPS, "LWV001")],
+        MODELS_INFO: [(PHILIPS, "LWO001"), (PHILIPS, "LWV001")],
         ENDPOINTS: {
             11: {
                 # <SimpleDescriptor endpoint=11 profile=260 device_type=528
