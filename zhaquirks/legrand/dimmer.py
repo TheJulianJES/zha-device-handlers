@@ -220,15 +220,18 @@ class DimmerWithoutNeutral3(CustomDevice):
     }
 
 
-class DimmerWithoutNeutralAndBallast(CustomDevice):
-    """Dimmer switch w/o neutral (at least for firmware 0x39)."""
+class Dimmer(CustomDevice):
+    """Dimmer switch w/o neutral (at least for firmware 0x39) and version of Dimmer switch with neutral."""
 
     signature = {
         #  <SimpleDescriptor endpoint=1 profile=260 device_type=256
         # device_version=1
         # input_clusters=[0, 3, 4, 5, 6, 8, 15, 769, 64513]
         # output_clusters=[0, 5, 6, 25, 64513]>
-        MODELS_INFO: [(f" {LEGRAND}", " Dimmer switch w/o neutral")],
+        MODELS_INFO: [
+            (f" {LEGRAND}", " Dimmer switch w/o neutral"),
+            (f" {LEGRAND}", " Dimmer switch with neutral"),
+        ],
         ENDPOINTS: {
             1: {
                 PROFILE_ID: zha.PROFILE_ID,
@@ -401,7 +404,7 @@ class DimmerWithNeutral2(CustomDevice):
 
 
 class RemoteDimmer(CustomDevice):
-    """Remote dimmer ."""
+    """Remote dimmer."""
 
     signature = {
         MODELS_INFO: [(f" {LEGRAND}", " Remote dimmer switch")],
