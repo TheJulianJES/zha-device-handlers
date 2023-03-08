@@ -128,3 +128,54 @@ class TintRemote(CustomDevice):
             },
         },
     }
+
+
+class TintRemote2(CustomDevice):
+    """Newer tint remote."""
+
+    signature = {
+        MODELS_INFO: [("MLI", "Remote Control")],
+        ENDPOINTS: {
+            1: {
+                PROFILE_ID: zha.PROFILE_ID,
+                DEVICE_TYPE: zha.DeviceType.COLOR_CONTROLLER,
+                INPUT_CLUSTERS: [
+                    Basic.cluster_id,
+                    Identify.cluster_id,
+                    0x100F,
+                ],
+                OUTPUT_CLUSTERS: [
+                    Identify.cluster_id,
+                    Groups.cluster_id,
+                    Scenes.cluster_id,
+                    OnOff.cluster_id,
+                    LevelControl.cluster_id,
+                    Color.cluster_id,
+                    LightLink.cluster_id,
+                ],
+            },
+        },
+    }
+
+    replacement = {
+        ENDPOINTS: {
+            1: {
+                PROFILE_ID: zha.PROFILE_ID,
+                DEVICE_TYPE: zha.DeviceType.COLOR_CONTROLLER,
+                INPUT_CLUSTERS: [
+                    TintRemoteBasicCluster,
+                    Identify.cluster_id,
+                    0x100F,
+                ],
+                OUTPUT_CLUSTERS: [
+                    Identify.cluster_id,
+                    Groups.cluster_id,
+                    TintRemoteScenesCluster,
+                    OnOff.cluster_id,
+                    LevelControl.cluster_id,
+                    Color.cluster_id,
+                    LightLink.cluster_id,
+                ],
+            },
+        },
+    }
