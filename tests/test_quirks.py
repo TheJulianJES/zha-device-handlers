@@ -831,3 +831,14 @@ def test_no_duplicate_clusters(quirk: CustomDevice) -> None:
     for ep_id, ep_data in quirk.replacement[ENDPOINTS].items():
         check_for_duplicate_cluster_ids(ep_data.get(INPUT_CLUSTERS, []))
         check_for_duplicate_cluster_ids(ep_data.get(OUTPUT_CLUSTERS, []))
+
+
+@pytest.mark.parametrize("quirk", ALL_QUIRK_CLASSES)
+def test_replacement_provides_profile_and_device(quirk: CustomDevice) -> None:
+    """Verify quirks provide PROFILE_ID and DEVICE_TYPE in their replacement."""
+
+    for ep_id, ep_data in quirk.replacement[ENDPOINTS].items():
+        if not ep_data.get(PROFILE_ID) or not ep_data.get(DEVICE_TYPE):
+            pytest.fail(
+                f"Quirk {quirk} is missing PROFILE_ID and/or DEVICE_TYPE in its replacement."
+            )
