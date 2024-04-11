@@ -9,7 +9,7 @@ on:
 
 jobs:
   shared-ci:
-    uses: zigpy/workflows/.github/workflows/ci.yml@main
+    uses: TheJulianJES/workflows/.github/workflows/ci.yml@tjj/codecov_v4_and_token
     with:
       CODE_FOLDER: zhaquirks
       CACHE_VERSION: 3
