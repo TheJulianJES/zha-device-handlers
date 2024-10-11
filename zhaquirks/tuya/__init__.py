@@ -897,7 +897,7 @@ class TuyaLocalCluster(LocalDataCluster):
     """
 
     def update_attribute(self, attr_name: str, value: Any) -> None:
-        """Update attribute by attribute name."""
+        """Update attribute by name and safeguard against unknown attributes."""
 
         try:
             attr = self.attributes_by_name[attr_name]
@@ -1543,7 +1543,17 @@ class TuyaNewManufCluster(CustomCluster):
         ),
     }
 
+    dp_to_attribute: dict[int, DPToAttributeMapping] = {}
     data_point_handlers: dict[int, str] = {}
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the cluster and mark attributes as valid on LocalDataClusters."""
+        super().__init__(*args, **kwargs)
+        for dp_map in self.dp_to_attribute.values():
+            cluster = getattr(self.endpoint, dp_map.ep_attribute)
+            attr_id = cluster.attributes_by_name.get(dp_map.attribute_name).id
+            if isinstance(cluster, LocalDataCluster) and attr_id is not None:
+                cluster._VALID_ATTRIBUTES.add(attr_id)
 
     def handle_cluster_request(
         self,
