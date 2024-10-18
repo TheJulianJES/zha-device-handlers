@@ -1,6 +1,7 @@
 """Saswell (Tuya whitelabel) 88teujp thermostat valve quirk."""
 
 import logging
+from typing import Final
 
 from zigpy.profiles import zha
 import zigpy.types as t
@@ -15,6 +16,7 @@ from zigpy.zcl.clusters.general import (
     Time,
 )
 from zigpy.zcl.clusters.hvac import Thermostat
+from zigpy.zcl.foundation import ZCLAttributeDef
 
 from zhaquirks import Bus, LocalDataCluster
 from zhaquirks.const import (
@@ -47,42 +49,63 @@ MIN_HEAT_SETPOINT_ATTR = 0x0015
 MAX_HEAT_SETPOINT_ATTR = 0x0016
 
 
+class State(t.enum8):
+    """State option."""
+
+    Off = 0x00
+    On = 0x01
+
+
+class BatteryState(t.enum8):
+    """Battery state option."""
+
+    Normal = 0x00
+    Low = 0x01
+
+
+class ScheduleState(t.enum8):
+    """Schedule state option."""
+
+    Disabled = 0x00
+    Enabled = 0x01
+
+
 class ManufacturerThermostatCluster(TuyaManufClusterAttributes):
     """Tuya manufacturer specific cluster."""
 
-    class State(t.enum8):
-        """State option."""
+    State: Final = State
+    BatteryState: Final = BatteryState
+    ScheduleState: Final = ScheduleState
 
-        Off = 0x00
-        On = 0x01
+    class AttributeDefs(TuyaManufClusterAttributes.AttributeDefs):
+        """Attribute definitions."""
 
-    class BatteryState(t.enum8):
-        """Battery state option."""
-
-        Normal = 0x00
-        Low = 0x01
-
-    class ScheduleState(t.enum8):
-        """Schedule state option."""
-
-        Disabled = 0x00
-        Enabled = 0x01
-
-    attributes = TuyaManufClusterAttributes.attributes.copy()
-    attributes.update(
-        {
-            SASWELL_STATE_ATTR: ("state", State, True),
-            SASWELL_HEATING_SETPOINT_ATTR: ("heating_setpoint", t.uint32_t, True),
-            SASWELL_LOCAL_TEMP_ATTR: ("local_temperature", t.uint32_t, True),
-            SASWELL_BATTERY_LOW_ATTR: ("battery_state", BatteryState, True),
-            SASWELL_SCHEDULE_ENABLE_ATTR: ("schedule_enabled", ScheduleState, True),
-            SASWELL_TEMPERATURE_CALIBRATION_ATTR: (
-                "temperature_calibration",
-                t.int32s,
-                True,
-            ),
-        }
-    )
+        state: Final = ZCLAttributeDef(
+            id=SASWELL_STATE_ATTR, type=State, is_manufacturer_specific=True
+        )
+        heating_setpoint: Final = ZCLAttributeDef(
+            id=SASWELL_HEATING_SETPOINT_ATTR,
+            type=t.uint32_t,
+            is_manufacturer_specific=True,
+        )
+        local_temperature: Final = ZCLAttributeDef(
+            id=SASWELL_LOCAL_TEMP_ATTR, type=t.uint32_t, is_manufacturer_specific=True
+        )
+        battery_state: Final = ZCLAttributeDef(
+            id=SASWELL_BATTERY_LOW_ATTR,
+            type=BatteryState,
+            is_manufacturer_specific=True,
+        )
+        schedule_enabled: Final = ZCLAttributeDef(
+            id=SASWELL_SCHEDULE_ENABLE_ATTR,
+            type=ScheduleState,
+            is_manufacturer_specific=True,
+        )
+        temperature_calibration: Final = ZCLAttributeDef(
+            id=SASWELL_TEMPERATURE_CALIBRATION_ATTR,
+            type=t.int32s,
+            is_manufacturer_specific=True,
+        )
 
     TEMPERATURE_ATTRS = {
         SASWELL_HEATING_SETPOINT_ATTR: "occupied_heating_setpoint",
@@ -127,18 +150,18 @@ class ThermostatCluster(TuyaThermostatCluster):
         """Handle reported system mode."""
         if value == 1:
             self._update_attribute(
-                self.attributes_by_name["system_mode"].id, Thermostat.SystemMode.Heat
+                self.AttributeDefs.system_mode.id, Thermostat.SystemMode.Heat
             )
             self._update_attribute(
-                self.attributes_by_name["running_mode"].id, Thermostat.RunningMode.Heat
+                self.AttributeDefs.running_mode.id, Thermostat.RunningMode.Heat
             )
             _LOGGER.debug("reported system_mode: heat")
         else:
             self._update_attribute(
-                self.attributes_by_name["system_mode"].id, Thermostat.SystemMode.Off
+                self.AttributeDefs.system_mode.id, Thermostat.SystemMode.Off
             )
             self._update_attribute(
-                self.attributes_by_name["running_mode"].id, Thermostat.RunningMode.Off
+                self.AttributeDefs.running_mode.id, Thermostat.RunningMode.Off
             )
             _LOGGER.debug("reported system_mode: off")
 
@@ -165,22 +188,21 @@ class TuyaTemperatureOffset(LocalDataCluster, AnalogOutput):
         """Init."""
         super().__init__(*args, **kwargs)
         self.endpoint.device.temperature_calibration_bus.add_listener(self)
-        self._update_attribute(
-            self.attributes_by_name["description"].id, "Temperature Offset"
-        )
-        self._update_attribute(self.attributes_by_name["max_present_value"].id, 6)
-        self._update_attribute(self.attributes_by_name["min_present_value"].id, -6)
-        self._update_attribute(self.attributes_by_name["resolution"].id, 1)
-        self._update_attribute(self.attributes_by_name["application_type"].id, 0x0009)
-        self._update_attribute(self.attributes_by_name["engineering_units"].id, 62)
+        # below should be _CONSTANT_ATTRIBUTES
+        self._update_attribute(self.AttributeDefs.description.id, "Temperature Offset")
+        self._update_attribute(self.AttributeDefs.max_present_value.id, 6)
+        self._update_attribute(self.AttributeDefs.min_present_value.id, -6)
+        self._update_attribute(self.AttributeDefs.resolution.id, 1)
+        self._update_attribute(self.AttributeDefs.application_type.id, 0x0009)
+        self._update_attribute(self.AttributeDefs.engineering_units.id, 62)
 
     def set_value(self, value):
         """Set new temperature offset value."""
-        self._update_attribute(self.attributes_by_name["present_value"].id, value)
+        self._update_attribute(self.AttributeDefs.present_value.id, value)
 
     def get_value(self):
         """Get current temperature offset value."""
-        return self._attr_cache.get(self.attributes_by_name["present_value"].id)
+        return self._attr_cache.get(self.AttributeDefs.present_value.id)
 
     async def write_attributes(self, attributes, manufacturer=None):
         """Modify value before passing it to the set_data tuya command."""

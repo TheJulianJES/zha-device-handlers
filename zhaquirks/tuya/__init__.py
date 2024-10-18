@@ -456,6 +456,9 @@ class TuyaManufCluster(CustomCluster):
 class TuyaManufClusterAttributes(TuyaManufCluster):
     """Manufacturer specific cluster for Tuya converting attributes <-> commands."""
 
+    class AttributeDefs(BaseAttributeDefs):
+        """Attribute definitions."""
+
     def handle_cluster_request(
         self,
         hdr: foundation.ZCLHeader,
@@ -676,6 +679,9 @@ class TuyaDimmerSwitch(TuyaSwitch):
 class TuyaThermostatCluster(LocalDataCluster, Thermostat):
     """Thermostat cluster for Tuya thermostats."""
 
+    class AttributeDefs(Thermostat.AttributeDefs):
+        """Attribute definitions."""
+
     _CONSTANT_ATTRIBUTES = {0x001B: Thermostat.ControlSequenceOfOperation.Heating_Only}
 
     def __init__(self, *args, **kwargs):
@@ -695,8 +701,8 @@ class TuyaThermostatCluster(LocalDataCluster, Thermostat):
         else:
             mode = self.RunningMode.Heat
             state = self.RunningState.Heat_State_On
-        self._update_attribute(self.attributes_by_name["running_mode"].id, mode)
-        self._update_attribute(self.attributes_by_name["running_state"].id, state)
+        self._update_attribute(self.AttributeDefs.running_mode.id, mode)
+        self._update_attribute(self.AttributeDefs.running_state.id, state)
 
     # pylint: disable=R0201
     def map_attribute(self, attribute, value):
