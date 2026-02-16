@@ -159,6 +159,11 @@ class InovelliCluster(CustomCluster):
             type=t.Bool,
             is_manufacturer_specific=True,
         )
+        ota_image_type = ZCLAttributeDef(
+            id=0x0022,
+            type=t.uint8_t,
+            is_manufacturer_specific=True,
+        )
         smart_bulb_mode = ZCLAttributeDef(
             id=0x0034,
             type=t.Bool,
@@ -1525,6 +1530,11 @@ class InovelliVZM35SNCluster(InovelliCluster):
             type=t.uint8_t,
             is_manufacturer_specific=True,
         )
+        led_scaling_mode = ZCLAttributeDef(
+            id=0x0064,
+            type=t.Bool,
+            is_manufacturer_specific=True,
+        )
         fan_single_tap_behavior = ZCLAttributeDef(
             id=0x0078,
             type=t.uint8_t,
@@ -1537,6 +1547,11 @@ class InovelliVZM35SNCluster(InovelliCluster):
         )
         aux_switch_scenes = ZCLAttributeDef(
             id=0x007B,
+            type=t.Bool,
+            is_manufacturer_specific=True,
+        )
+        binding_off_to_on_sync_level = ZCLAttributeDef(
+            id=0x007D,
             type=t.Bool,
             is_manufacturer_specific=True,
         )
@@ -1582,6 +1597,11 @@ class InovelliVZM35SNCluster(InovelliCluster):
         )
         firmware_progress_led = ZCLAttributeDef(
             id=0x0104,
+            type=t.Bool,
+            is_manufacturer_specific=True,
+        )
+        relay_click_in_on_off_mode = ZCLAttributeDef(
+            id=0x0105,
             type=t.Bool,
             is_manufacturer_specific=True,
         )
