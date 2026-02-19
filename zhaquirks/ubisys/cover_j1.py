@@ -2,9 +2,11 @@
 
 from zigpy.quirks import CustomCluster
 from zigpy.quirks.v2 import QuirkBuilder
+from zigpy.zcl.clusters.closures import WindowCovering
 from zigpy.zcl.clusters.homeautomation import ElectricalMeasurement
 
 from zhaquirks.quirk_ids import SE_POLL_SUMMATION
+from zhaquirks.ubisys import UbisysCluster, UbisysInputConfigCluster
 
 
 class UbisysElectricalMeasurement(CustomCluster, ElectricalMeasurement):
@@ -16,8 +18,27 @@ class UbisysElectricalMeasurement(CustomCluster, ElectricalMeasurement):
     }
 
 
+class UbisysJ1InputConfigCluster(UbisysInputConfigCluster):
+    """Input configuration for the J1.
+
+    EP2 -> EP1 with WindowCovering self-binding.
+    Only detached mode is exposed (input_mode templates are OnOff-based
+    and don't apply to cover commands).
+    """
+
+    BIND_CLUSTERS: list[int] = [WindowCovering.cluster_id]
+
+
 (
     QuirkBuilder(manufacturer="ubisys", model="J1 (5502)")
+    .replaces(UbisysCluster, endpoint_id=232)
+    .adds(UbisysJ1InputConfigCluster)
+    .switch(
+        attribute_name=UbisysJ1InputConfigCluster.AttributeDefs.detached.name,
+        cluster_id=UbisysJ1InputConfigCluster.cluster_id,
+        translation_key="detached",
+        fallback_name="Detached mode",
+    )
     .replaces(UbisysElectricalMeasurement, endpoint_id=3)
     # The device exposes total active power on multiple attributes,
     # but only supports attribute reporting on the SE "instantaneous demand" attribute,
