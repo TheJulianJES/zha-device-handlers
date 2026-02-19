@@ -68,6 +68,7 @@ class UbisysS2InputConfigCluster(UbisysInputConfigCluster):
 
 (
     QuirkBuilder(manufacturer="ubisys", model="S2 (5502)")
+    .applies_to(manufacturer="ubisys", model="S2-R (5602)")
     .replaces(UbisysCluster, endpoint_id=232)
     .adds(UbisysS2InputConfigCluster)
     .enum(
