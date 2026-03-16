@@ -282,6 +282,11 @@ class UbisysLD6OutputConfigCluster(LocalDataCluster):
                 device_setup = self.endpoint.device.endpoints[232].ubisys_cluster
                 result = await device_setup.write_output_configurations(configs)
                 self._update_attribute(self.AttributeDefs.output_mode.id, mode)
+                # The LD6 dynamically reconfigures its endpoints after an
+                # output mode change.  Re-interview so ZHA picks up the new
+                # endpoint layout (added/removed endpoints, changed device
+                # types and clusters).
+                await self.endpoint.device.reinterview()
                 return result
 
         raise KeyError(attributes)  # pragma: no cover
