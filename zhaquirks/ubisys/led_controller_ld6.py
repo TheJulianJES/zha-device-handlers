@@ -370,6 +370,7 @@ class UbisysLD6OutputConfigCluster(LocalDataCluster):
 
     async def apply_custom_configuration(self, *args, **kwargs):
         """Read the device's current output configuration and sync the local enum."""
+        # XXX: We should have a quirks v2 API for adding attributes to ZCL_INIT_ATTRS
         setup = self.endpoint.device.endpoints[232].ubisys_cluster
         result = await setup.read_attributes(
             [UbisysLD6SetupCluster.AttributeDefs.output_configurations]
