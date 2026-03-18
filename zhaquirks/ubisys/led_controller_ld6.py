@@ -15,6 +15,7 @@ from zigpy.zcl import (
     AttributeReportedEvent,
     AttributeUpdatedEvent,
     AttributeWrittenEvent,
+    foundation,
 )
 from zigpy.zcl.foundation import BaseAttributeDefs, ZCLAttributeDef
 
@@ -270,9 +271,35 @@ def _match_output_mode(raw_configs: list[bytes]) -> OutputMode | None:
 class UbisysLD6SetupCluster(UbisysCluster):
     """UbisysCluster subclass for the LD6.
 
-    Listens to its own output_configurations attribute events and syncs
-    the matched OutputMode to the local UbisysLD6OutputConfigCluster.
+    Adds the output_configurations attribute and write method (only relevant
+    for devices with the Versalight engine). Listens to its own attribute
+    events and syncs the matched OutputMode to the local config cluster.
     """
+
+    class AttributeDefs(UbisysCluster.AttributeDefs):
+        """Extended attribute definitions with output_configurations."""
+
+        output_configurations: Final = ZCLAttributeDef(
+            id=0x0010, type=t.LVList[t.LVBytes, t.uint16_t], manufacturer_code=None
+        )
+
+    async def write_output_configurations(self, configs: list[bytes]) -> list:
+        """Write output_configurations using ZCL Write Attributes Structured."""
+        arr = foundation.Array(
+            type=foundation.DataTypeId.octstr,
+            value=t.LVList[t.LVBytes, t.uint16_t](configs),
+        )
+        return await self.write_attributes_structured_raw(
+            [
+                foundation.WriteAttributeStructured(
+                    attrid=self.AttributeDefs.output_configurations.id,
+                    selector=foundation.Selector(depth=0),
+                    value=foundation.TypeValue(
+                        type=foundation.DataTypeId.array, value=arr
+                    ),
+                )
+            ]
+        )
 
     def __init__(self, *args, **kwargs):
         """Init and register self-listeners for output_configurations."""
@@ -348,9 +375,11 @@ class UbisysLD6OutputConfigCluster(LocalDataCluster):
         """Read the device's current output configuration and sync the local enum."""
         setup = self.endpoint.device.endpoints[232].ubisys_cluster
         result = await setup.read_attributes(
-            [UbisysCluster.AttributeDefs.output_configurations]
+            [UbisysLD6SetupCluster.AttributeDefs.output_configurations]
         )
-        raw = result[0].get(UbisysCluster.AttributeDefs.output_configurations.name)
+        raw = result[0].get(
+            UbisysLD6SetupCluster.AttributeDefs.output_configurations.name
+        )
         if raw is not None:
             mode = _match_output_mode(list(raw))
             if mode is not None:

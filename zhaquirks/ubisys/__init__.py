@@ -39,9 +39,6 @@ class UbisysCluster(CustomCluster):
         input_actions: Final = ZCLAttributeDef(
             id=0x0001, type=t.LVList[t.LVBytes, t.uint16_t], manufacturer_code=None
         )
-        output_configurations: Final = ZCLAttributeDef(
-            id=0x0010, type=t.LVList[t.LVBytes, t.uint16_t], manufacturer_code=None
-        )
         cluster_revision: Final = ZCLAttributeDef(
             id=0xFFFD, type=t.uint16_t, manufacturer_code=None
         )
@@ -60,28 +57,6 @@ class UbisysCluster(CustomCluster):
             [
                 foundation.WriteAttributeStructured(
                     attrid=self.AttributeDefs.input_actions.id,
-                    selector=foundation.Selector(depth=0),
-                    value=foundation.TypeValue(
-                        type=foundation.DataTypeId.array, value=arr
-                    ),
-                )
-            ]
-        )
-
-    async def write_output_configurations(self, configs: list[bytes]) -> list:
-        """Write output_configurations using ZCL Write Attributes Structured.
-
-        Same structured write approach as write_input_actions — ubisys devices
-        require the structured write command (0x0F) for array attributes.
-        """
-        arr = foundation.Array(
-            type=foundation.DataTypeId.octstr,
-            value=t.LVList[t.LVBytes, t.uint16_t](configs),
-        )
-        return await self.write_attributes_structured_raw(
-            [
-                foundation.WriteAttributeStructured(
-                    attrid=self.AttributeDefs.output_configurations.id,
                     selector=foundation.Selector(depth=0),
                     value=foundation.TypeValue(
                         type=foundation.DataTypeId.array, value=arr
