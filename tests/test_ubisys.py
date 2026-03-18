@@ -4,7 +4,7 @@ from unittest import mock
 
 import pytest
 import zigpy.types as t
-from zigpy.zcl import AttributeReadEvent, AttributeWrittenEvent, ClusterType
+from zigpy.zcl import AttributeWrittenEvent, ClusterType
 from zigpy.zcl.clusters.closures import WindowCovering
 from zigpy.zcl.clusters.general import LevelControl, OnOff
 from zigpy.zcl.clusters.homeautomation import ElectricalMeasurement
@@ -1502,21 +1502,10 @@ async def test_ld6_output_mode_event_sync(ubisys_ld6):
 
     config_listener = ClusterListener(config_cluster)
 
-    # Simulate an AttributeReadEvent for the RGBCW_1x profile
-    raw_configs = OUTPUT_MODE_DATA[OutputMode.RGBCW_1x]
-    setup_cluster.emit(
-        AttributeReadEvent.event_type,
-        AttributeReadEvent(
-            device_ieee=str(ubisys_ld6.ieee),
-            endpoint_id=232,
-            cluster_type=ClusterType.Server,
-            cluster_id=UbisysLD6SetupCluster.cluster_id,
-            attribute_name=UbisysLD6SetupCluster.AttributeDefs.output_configurations.name,
-            attribute_id=UbisysLD6SetupCluster.AttributeDefs.output_configurations.id,
-            manufacturer_code=None,
-            raw_value=raw_configs,
-            value=raw_configs,
-        ),
+    # Simulate the output_configurations attribute being updated
+    setup_cluster.update_attribute(
+        UbisysLD6SetupCluster.AttributeDefs.output_configurations.id,
+        OUTPUT_MODE_DATA[OutputMode.RGBCW_1x],
     )
 
     # Verify the config cluster was updated
@@ -1533,28 +1522,17 @@ async def test_ld6_output_mode_event_ignores_unknown(ubisys_ld6):
 
     config_listener = ClusterListener(config_cluster)
 
-    # Custom configuration that doesn't match any known profile
-    unknown_configs = [
-        bytes([0x13, 0x47, 0x06, 0xB1, 0xEF, 0x4E]),
-        bytes([0x14, 0xA0, 0x39, 0x1D, 0x82, 0xD3]),
-        bytes([0x15, 0x42, 0xC6, 0x1F, 0xCC, 0x0E]),
-        bytes([0x16, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE]),  # non-standard function byte
-        bytes([0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]),
-        bytes([0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]),
-    ]
-    setup_cluster.emit(
-        AttributeReadEvent.event_type,
-        AttributeReadEvent(
-            device_ieee=str(ubisys_ld6.ieee),
-            endpoint_id=232,
-            cluster_type=ClusterType.Server,
-            cluster_id=UbisysLD6SetupCluster.cluster_id,
-            attribute_name=UbisysLD6SetupCluster.AttributeDefs.output_configurations.name,
-            attribute_id=UbisysLD6SetupCluster.AttributeDefs.output_configurations.id,
-            manufacturer_code=None,
-            raw_value=unknown_configs,
-            value=unknown_configs,
-        ),
+    # Update with a configuration that doesn't match any known profile
+    setup_cluster.update_attribute(
+        UbisysLD6SetupCluster.AttributeDefs.output_configurations.id,
+        [
+            bytes([0x13, 0x47, 0x06, 0xB1, 0xEF, 0x4E]),
+            bytes([0x14, 0xA0, 0x39, 0x1D, 0x82, 0xD3]),
+            bytes([0x15, 0x42, 0xC6, 0x1F, 0xCC, 0x0E]),
+            bytes([0x16, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE]),  # non-standard function byte
+            bytes([0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]),
+            bytes([0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]),
+        ],
     )
 
     # No output_mode update should have been emitted
@@ -1568,21 +1546,8 @@ async def test_ld6_event_ignores_other_attributes(ubisys_ld6):
 
     config_listener = ClusterListener(config_cluster)
 
-    # Emit an event for input_actions (attribute 0x0001), not output_configurations
-    setup_cluster.emit(
-        AttributeReadEvent.event_type,
-        AttributeReadEvent(
-            device_ieee=str(ubisys_ld6.ieee),
-            endpoint_id=232,
-            cluster_type=ClusterType.Server,
-            cluster_id=UbisysLD6SetupCluster.cluster_id,
-            attribute_name=UbisysCluster.AttributeDefs.input_actions.name,
-            attribute_id=UbisysCluster.AttributeDefs.input_actions.id,
-            manufacturer_code=None,
-            raw_value=[],
-            value=[],
-        ),
-    )
+    # Update input_actions (attribute 0x0001), not output_configurations
+    setup_cluster.update_attribute(UbisysCluster.AttributeDefs.input_actions.id, [])
 
     # No output_mode update should have been emitted
     assert config_listener.attribute_updates == []
