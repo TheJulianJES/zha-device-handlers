@@ -1557,14 +1557,8 @@ async def test_ld6_output_mode_event_ignores_unknown(ubisys_ld6):
         ),
     )
 
-    # No output_mode update should have been emitted (only the default from __init__)
-    output_mode_updates = [
-        (aid, val)
-        for aid, val in config_listener.attribute_updates
-        if aid == UbisysLD6OutputConfigCluster.AttributeDefs.output_mode.id
-        and val != OutputMode.Dimmable_1x  # filter out the __init__ default
-    ]
-    assert output_mode_updates == []
+    # No output_mode update should have been emitted
+    assert config_listener.attribute_updates == []
 
 
 async def test_ld6_event_ignores_other_attributes(ubisys_ld6):
@@ -1590,14 +1584,8 @@ async def test_ld6_event_ignores_other_attributes(ubisys_ld6):
         ),
     )
 
-    # Only the default from __init__ should be present
-    output_mode_updates = [
-        (aid, val)
-        for aid, val in config_listener.attribute_updates
-        if aid == UbisysLD6OutputConfigCluster.AttributeDefs.output_mode.id
-        and val != OutputMode.Dimmable_1x
-    ]
-    assert output_mode_updates == []
+    # No output_mode update should have been emitted
+    assert config_listener.attribute_updates == []
 
 
 async def test_ld6_failed_write_event_ignored(ubisys_ld6):
@@ -1623,14 +1611,8 @@ async def test_ld6_failed_write_event_ignored(ubisys_ld6):
         ),
     )
 
-    # No output_mode update for RGB_2x should appear
-    output_mode_updates = [
-        (aid, val)
-        for aid, val in config_listener.attribute_updates
-        if aid == UbisysLD6OutputConfigCluster.AttributeDefs.output_mode.id
-        and val == OutputMode.RGB_2x
-    ]
-    assert output_mode_updates == []
+    # No output_mode update should have been emitted
+    assert config_listener.attribute_updates == []
 
 
 def test_match_output_mode_all_profiles():

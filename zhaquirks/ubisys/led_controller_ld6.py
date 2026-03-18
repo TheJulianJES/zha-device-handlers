@@ -361,6 +361,8 @@ class UbisysLD6OutputConfigCluster(LocalDataCluster):
     def __init__(self, *args, **kwargs):
         """Init with default output mode."""
         super().__init__(*args, **kwargs)
+        # XXX: _update_attribute in __init__ fires events before the device is
+        # fully constructed. Replace with _DEFAULT_VALUES when available in zigpy.
         if self.AttributeDefs.output_mode.id not in self._attr_cache:
             self._update_attribute(
                 self.AttributeDefs.output_mode.id, OutputMode.Dimmable_1x
