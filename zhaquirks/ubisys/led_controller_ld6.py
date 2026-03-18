@@ -330,16 +330,16 @@ class UbisysLD6SetupCluster(UbisysCluster):
             return
         if isinstance(event, AttributeWrittenEvent) and event.status != Status.SUCCESS:
             return
-        config_cluster = self.endpoint.device.endpoints[1].ubisys_ld6_output_config
         mode = _match_output_mode(list(event.value))
-        if mode is not None:
-            config_cluster.update_attribute(
-                UbisysLD6OutputConfigCluster.AttributeDefs.output_mode.id, mode
-            )
-        else:
+        if mode is None:
             _LOGGER.debug(
                 "ubisys LD6: output configuration does not match any known profile"
             )
+            return
+        config_cluster = self.endpoint.device.endpoints[1].ubisys_ld6_output_config
+        config_cluster.update_attribute(
+            UbisysLD6OutputConfigCluster.AttributeDefs.output_mode.id, mode
+        )
 
 
 class UbisysLD6OutputConfigCluster(LocalDataCluster):
