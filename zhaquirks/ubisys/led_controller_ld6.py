@@ -277,13 +277,16 @@ class UbisysLD6SetupCluster(UbisysCluster):
     def __init__(self, *args, **kwargs):
         """Init and register self-listeners for output_configurations."""
         super().__init__(*args, **kwargs)
-        for event_type in (
-            AttributeReadEvent.event_type,
-            AttributeReportedEvent.event_type,
-            AttributeUpdatedEvent.event_type,
-            AttributeWrittenEvent.event_type,
-        ):
-            self.on_event(event_type, self._handle_output_config_event)
+        self.on_event(AttributeReadEvent.event_type, self._handle_output_config_event)
+        self.on_event(
+            AttributeReportedEvent.event_type, self._handle_output_config_event
+        )
+        self.on_event(
+            AttributeUpdatedEvent.event_type, self._handle_output_config_event
+        )
+        self.on_event(
+            AttributeWrittenEvent.event_type, self._handle_output_config_event
+        )
 
     def _handle_output_config_event(
         self,
