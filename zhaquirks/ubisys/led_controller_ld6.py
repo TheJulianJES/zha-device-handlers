@@ -260,19 +260,17 @@ OUTPUT_MODE_DATA: dict[OutputMode, list[bytes]] = {
 }
 
 
-def _match_output_mode(raw_configs: list[bytes]) -> OutputMode | None:
-    """Match raw OutputConfigurations data to a known OutputMode.
+# Precomputed lookup: tuple of first bytes (EndpointAndFunction) -> OutputMode.
+# Only the first byte identifies the profile; chromaticity/flux values are ignored
+# so user calibration doesn't break matching.
+_FUNC_BYTE_TO_MODE: dict[tuple[int, ...], OutputMode] = {
+    tuple(c[0] for c in configs): mode for mode, configs in OUTPUT_MODE_DATA.items()
+}
 
-    Compares only the first byte (EndpointAndFunction) of each slot,
-    which is sufficient to identify the profile without being sensitive
-    to user-customized chromaticity/flux calibration values.
-    """
-    raw_funcs = [c[0] if c else 0 for c in raw_configs]
-    for mode, ref_configs in OUTPUT_MODE_DATA.items():
-        ref_funcs = [c[0] for c in ref_configs]
-        if raw_funcs == ref_funcs:
-            return mode
-    return None
+
+def _match_output_mode(raw_configs: list[bytes]) -> OutputMode | None:
+    """Match raw OutputConfigurations data to a known OutputMode."""
+    return _FUNC_BYTE_TO_MODE.get(tuple(c[0] if c else 0 for c in raw_configs))
 
 
 class UbisysLD6SetupCluster(UbisysCluster):
