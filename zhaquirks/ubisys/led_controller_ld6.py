@@ -17,7 +17,12 @@ from zigpy.zcl import (
     AttributeWrittenEvent,
     foundation,
 )
-from zigpy.zcl.foundation import BaseAttributeDefs, ZCLAttributeDef
+from zigpy.zcl.foundation import (
+    BaseAttributeDefs,
+    DefaultResponse,
+    WriteAttributesStructuredResponseSchema,
+    ZCLAttributeDef,
+)
 
 from zhaquirks import LocalDataCluster
 from zhaquirks.ubisys import UbisysCluster
@@ -283,7 +288,9 @@ class UbisysLD6SetupCluster(UbisysCluster):
             id=0x0010, type=t.LVList[t.LVBytes, t.uint16_t], manufacturer_code=None
         )
 
-    async def write_output_configurations(self, configs: list[bytes]) -> list:
+    async def write_output_configurations(
+        self, configs: list[bytes]
+    ) -> WriteAttributesStructuredResponseSchema | DefaultResponse:
         """Write output_configurations using ZCL Write Attributes Structured."""
         arr = foundation.Array(
             type=foundation.DataTypeId.octstr,
@@ -402,14 +409,16 @@ class UbisysLD6OutputConfigCluster(LocalDataCluster):
                 mode = OutputMode(value)
                 configs = OUTPUT_MODE_DATA[mode]
                 device_setup = self.endpoint.device.endpoints[232].ubisys_cluster
-                result = await device_setup.write_output_configurations(configs)
+                await device_setup.write_output_configurations(configs)
                 self._update_attribute(self.AttributeDefs.output_mode.id, mode)
                 # The LD6 dynamically reconfigures its endpoints after an
                 # output mode change.  Re-interview so ZHA picks up the new
                 # endpoint layout (added/removed endpoints, changed device
                 # types and clusters).
                 await self.endpoint.device.reinterview()
-                return result
+                return [
+                    [foundation.WriteAttributesStatusRecord(foundation.Status.SUCCESS)]
+                ]
 
         raise KeyError(attributes)  # pragma: no cover
 
