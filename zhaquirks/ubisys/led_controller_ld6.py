@@ -20,6 +20,8 @@ from zigpy.zcl import (
 from zigpy.zcl.foundation import (
     BaseAttributeDefs,
     DefaultResponse,
+    Status,
+    WriteAttributesStatusRecord,
     WriteAttributesStructuredResponseSchema,
     ZCLAttributeDef,
 )
@@ -334,7 +336,7 @@ class UbisysLD6SetupCluster(UbisysCluster):
         """Sync local output_mode when output_configurations changes."""
         if event.attribute_id != self.AttributeDefs.output_configurations.id:
             return
-        if isinstance(event, AttributeWrittenEvent) and event.status != 0:
+        if isinstance(event, AttributeWrittenEvent) and event.status != Status.SUCCESS:
             return
         config_cluster = self.endpoint.device.endpoints[1].ubisys_ld6_output_config
         mode = _match_output_mode(list(event.value))
@@ -410,9 +412,7 @@ class UbisysLD6OutputConfigCluster(LocalDataCluster):
                 # endpoint layout (added/removed endpoints, changed device
                 # types and clusters).
                 await self.endpoint.device.reinterview()
-                return [
-                    [foundation.WriteAttributesStatusRecord(foundation.Status.SUCCESS)]
-                ]
+                return [[WriteAttributesStatusRecord(Status.SUCCESS)]]
 
         raise KeyError(attributes)  # pragma: no cover
 
