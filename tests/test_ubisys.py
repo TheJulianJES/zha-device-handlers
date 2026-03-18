@@ -4,7 +4,7 @@ from unittest import mock
 
 import pytest
 import zigpy.types as t
-from zigpy.zcl import AttributeWrittenEvent, ClusterType
+from zigpy.zcl import AttributeReadEvent, AttributeWrittenEvent, ClusterType
 from zigpy.zcl.clusters.closures import WindowCovering
 from zigpy.zcl.clusters.general import LevelControl, OnOff
 from zigpy.zcl.clusters.homeautomation import ElectricalMeasurement
@@ -30,6 +30,13 @@ from zhaquirks.ubisys.dimmer_d1 import (
     UbisysD1InputConfigCluster,
     build_dimmer_double_actions,
     build_dimmer_single_actions,
+)
+from zhaquirks.ubisys.led_controller_ld6 import (
+    OUTPUT_MODE_DATA,
+    OutputMode,
+    UbisysLD6OutputConfigCluster,
+    UbisysLD6SetupCluster,
+    _match_output_mode,
 )
 from zhaquirks.ubisys.switch_s1r import UbisysS1RInputConfigCluster
 from zhaquirks.ubisys.switch_s2 import UbisysS2InputConfigCluster
@@ -1401,3 +1408,248 @@ async def test_c4_input_mode_write(ubisys_c4, attr_name, input_index, source_ep)
     # Verify the correct attribute was cached
     attr_def = getattr(UbisysC4InputConfigCluster.AttributeDefs, attr_name)
     assert (attr_def.id, mode) in input_config_listener.attribute_updates
+
+
+# --- LD6 Tests ---
+
+
+@pytest.fixture
+def ubisys_ld6(zigpy_device_from_v2_quirk):
+    """Create ubisys LD6 device."""
+    return zigpy_device_from_v2_quirk(
+        "ubisys",
+        "LD6",
+        cluster_ids={
+            232: {UbisysCluster.cluster_id: ClusterType.Server},
+        },
+    )
+
+
+def _build_expected_output_frame(configs: list[bytes], tsn: int = 0) -> bytes:
+    """Build the expected ZCL Write Attributes Structured frame for output configs."""
+    frame = bytearray()
+    frame.append(0x00)  # Frame control
+    frame.append(tsn)
+    frame.append(0x0F)  # Write Attributes Structured
+    # Attribute ID 0x0010 (output_configurations) LE
+    frame.extend(b"\x10\x00")
+    # Selector: 0x00 (whole attribute)
+    frame.append(0x00)
+    # Data Type: 0x48 (Array), Element Type: 0x41 (OCTET_STR)
+    frame.extend(b"\x48\x41")
+    # Count (uint16 LE)
+    frame.extend(len(configs).to_bytes(2, byteorder="little"))
+    # Elements
+    for config in configs:
+        frame.append(len(config))
+        frame.extend(config)
+    return bytes(frame)
+
+
+async def test_ld6_output_mode_write(ubisys_ld6):
+    """Test writing output_mode sends correct output_configurations to EP232."""
+    config_cluster = ubisys_ld6.endpoints[1].ubisys_ld6_output_config
+    endpoint_232 = ubisys_ld6.endpoints[232]
+
+    config_listener = ClusterListener(config_cluster)
+
+    with (
+        mock.patch.object(
+            endpoint_232,
+            "request",
+            mock.AsyncMock(return_value=[0]),
+        ),
+        mock.patch.object(
+            ubisys_ld6,
+            "reinterview",
+            mock.AsyncMock(),
+        ),
+    ):
+        await config_cluster.write_attributes(
+            {
+                UbisysLD6OutputConfigCluster.AttributeDefs.output_mode.name: OutputMode.RGBW_1x
+            }
+        )
+
+        # Verify structured write was sent to endpoint 232
+        assert endpoint_232.request.call_count == 1
+
+        call_kwargs = endpoint_232.request.call_args
+        assert call_kwargs.kwargs["cluster"] == UbisysLD6SetupCluster.cluster_id
+        assert call_kwargs.kwargs["command_id"] == 0x0F
+
+        sent_data = call_kwargs.kwargs["data"]
+        tsn = sent_data[1]
+        expected = _build_expected_output_frame(
+            OUTPUT_MODE_DATA[OutputMode.RGBW_1x], tsn=tsn
+        )
+        assert sent_data == expected
+
+        # Verify reinterview was called
+        ubisys_ld6.reinterview.assert_called_once()
+
+    # Verify local cache was updated
+    assert (
+        UbisysLD6OutputConfigCluster.AttributeDefs.output_mode.id,
+        OutputMode.RGBW_1x,
+    ) in config_listener.attribute_updates
+
+
+async def test_ld6_output_mode_event_sync(ubisys_ld6):
+    """Test that an AttributeReadEvent on EP232 syncs to the local config cluster."""
+    setup_cluster = ubisys_ld6.endpoints[232].ubisys_cluster
+    config_cluster = ubisys_ld6.endpoints[1].ubisys_ld6_output_config
+
+    config_listener = ClusterListener(config_cluster)
+
+    # Simulate an AttributeReadEvent for the RGBCW_1x profile
+    raw_configs = OUTPUT_MODE_DATA[OutputMode.RGBCW_1x]
+    setup_cluster.emit(
+        AttributeReadEvent.event_type,
+        AttributeReadEvent(
+            device_ieee=str(ubisys_ld6.ieee),
+            endpoint_id=232,
+            cluster_type=ClusterType.Server,
+            cluster_id=UbisysLD6SetupCluster.cluster_id,
+            attribute_name=UbisysLD6SetupCluster.AttributeDefs.output_configurations.name,
+            attribute_id=UbisysLD6SetupCluster.AttributeDefs.output_configurations.id,
+            manufacturer_code=None,
+            raw_value=raw_configs,
+            value=raw_configs,
+        ),
+    )
+
+    # Verify the config cluster was updated
+    assert (
+        UbisysLD6OutputConfigCluster.AttributeDefs.output_mode.id,
+        OutputMode.RGBCW_1x,
+    ) in config_listener.attribute_updates
+
+
+async def test_ld6_output_mode_event_ignores_unknown(ubisys_ld6):
+    """Test that an unrecognized output configuration does not update the enum."""
+    setup_cluster = ubisys_ld6.endpoints[232].ubisys_cluster
+    config_cluster = ubisys_ld6.endpoints[1].ubisys_ld6_output_config
+
+    config_listener = ClusterListener(config_cluster)
+
+    # Custom configuration that doesn't match any known profile
+    unknown_configs = [
+        bytes([0x13, 0x47, 0x06, 0xB1, 0xEF, 0x4E]),
+        bytes([0x14, 0xA0, 0x39, 0x1D, 0x82, 0xD3]),
+        bytes([0x15, 0x42, 0xC6, 0x1F, 0xCC, 0x0E]),
+        bytes([0x16, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE]),  # non-standard function byte
+        bytes([0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]),
+        bytes([0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]),
+    ]
+    setup_cluster.emit(
+        AttributeReadEvent.event_type,
+        AttributeReadEvent(
+            device_ieee=str(ubisys_ld6.ieee),
+            endpoint_id=232,
+            cluster_type=ClusterType.Server,
+            cluster_id=UbisysLD6SetupCluster.cluster_id,
+            attribute_name=UbisysLD6SetupCluster.AttributeDefs.output_configurations.name,
+            attribute_id=UbisysLD6SetupCluster.AttributeDefs.output_configurations.id,
+            manufacturer_code=None,
+            raw_value=unknown_configs,
+            value=unknown_configs,
+        ),
+    )
+
+    # No output_mode update should have been emitted (only the default from __init__)
+    output_mode_updates = [
+        (aid, val)
+        for aid, val in config_listener.attribute_updates
+        if aid == UbisysLD6OutputConfigCluster.AttributeDefs.output_mode.id
+        and val != OutputMode.Dimmable_1x  # filter out the __init__ default
+    ]
+    assert output_mode_updates == []
+
+
+async def test_ld6_event_ignores_other_attributes(ubisys_ld6):
+    """Test that events for non-output_configurations attributes are ignored."""
+    setup_cluster = ubisys_ld6.endpoints[232].ubisys_cluster
+    config_cluster = ubisys_ld6.endpoints[1].ubisys_ld6_output_config
+
+    config_listener = ClusterListener(config_cluster)
+
+    # Emit an event for input_actions (attribute 0x0001), not output_configurations
+    setup_cluster.emit(
+        AttributeReadEvent.event_type,
+        AttributeReadEvent(
+            device_ieee=str(ubisys_ld6.ieee),
+            endpoint_id=232,
+            cluster_type=ClusterType.Server,
+            cluster_id=UbisysLD6SetupCluster.cluster_id,
+            attribute_name=UbisysCluster.AttributeDefs.input_actions.name,
+            attribute_id=UbisysCluster.AttributeDefs.input_actions.id,
+            manufacturer_code=None,
+            raw_value=[],
+            value=[],
+        ),
+    )
+
+    # Only the default from __init__ should be present
+    output_mode_updates = [
+        (aid, val)
+        for aid, val in config_listener.attribute_updates
+        if aid == UbisysLD6OutputConfigCluster.AttributeDefs.output_mode.id
+        and val != OutputMode.Dimmable_1x
+    ]
+    assert output_mode_updates == []
+
+
+async def test_ld6_failed_write_event_ignored(ubisys_ld6):
+    """Test that a failed AttributeWrittenEvent does not sync."""
+    setup_cluster = ubisys_ld6.endpoints[232].ubisys_cluster
+    config_cluster = ubisys_ld6.endpoints[1].ubisys_ld6_output_config
+
+    config_listener = ClusterListener(config_cluster)
+
+    raw_configs = OUTPUT_MODE_DATA[OutputMode.RGB_2x]
+    setup_cluster.emit(
+        AttributeWrittenEvent.event_type,
+        AttributeWrittenEvent(
+            device_ieee=str(ubisys_ld6.ieee),
+            endpoint_id=232,
+            cluster_type=ClusterType.Server,
+            cluster_id=UbisysLD6SetupCluster.cluster_id,
+            attribute_name=UbisysLD6SetupCluster.AttributeDefs.output_configurations.name,
+            attribute_id=UbisysLD6SetupCluster.AttributeDefs.output_configurations.id,
+            manufacturer_code=None,
+            value=raw_configs,
+            status=Status.FAILURE,
+        ),
+    )
+
+    # No output_mode update for RGB_2x should appear
+    output_mode_updates = [
+        (aid, val)
+        for aid, val in config_listener.attribute_updates
+        if aid == UbisysLD6OutputConfigCluster.AttributeDefs.output_mode.id
+        and val == OutputMode.RGB_2x
+    ]
+    assert output_mode_updates == []
+
+
+def test_match_output_mode_all_profiles():
+    """Test that _match_output_mode matches all 23 known profiles."""
+    for mode, configs in OUTPUT_MODE_DATA.items():
+        assert _match_output_mode(configs) == mode
+
+
+def test_match_output_mode_ignores_calibration():
+    """Test that matching ignores chromaticity/flux (only checks first byte)."""
+    # Take RGBW_1x but change all calibration bytes
+    modified = [
+        bytes([c[0], 0x00, 0x00, 0x00, 0x00, 0x00])
+        for c in OUTPUT_MODE_DATA[OutputMode.RGBW_1x]
+    ]
+    assert _match_output_mode(modified) == OutputMode.RGBW_1x
+
+
+def test_match_output_mode_unknown():
+    """Test that _match_output_mode returns None for unknown configurations."""
+    unknown = [bytes([0xFF, 0x00, 0x00, 0x00, 0x00, 0x00])] * 6
+    assert _match_output_mode(unknown) is None
