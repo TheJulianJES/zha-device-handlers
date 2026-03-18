@@ -5,14 +5,23 @@ ubisys LD6 technical reference. Each profile maps 6 PWM channels to 1-6 light
 endpoints with different capabilities (dimmable, CCT, RGB, RGBW, etc.).
 """
 
+import logging
 from typing import Any, Final
 
 from zigpy.quirks.v2 import QuirkBuilder
 import zigpy.types as t
+from zigpy.zcl import (
+    AttributeReadEvent,
+    AttributeReportedEvent,
+    AttributeUpdatedEvent,
+    AttributeWrittenEvent,
+)
 from zigpy.zcl.foundation import BaseAttributeDefs, ZCLAttributeDef
 
 from zhaquirks import LocalDataCluster
 from zhaquirks.ubisys import UbisysCluster
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class OutputMode(t.enum8):
@@ -260,12 +269,92 @@ class UbisysLD6OutputConfigCluster(LocalDataCluster):
         output_mode: Final = ZCLAttributeDef(id=0x0000, type=OutputMode)
 
     def __init__(self, *args, **kwargs):
-        """Init with default output mode."""
+        """Init with default output mode and register event listeners."""
         super().__init__(*args, **kwargs)
         if self.AttributeDefs.output_mode.id not in self._attr_cache:
             self._update_attribute(
                 self.AttributeDefs.output_mode.id, OutputMode.Dimmable_1x
             )
+        # Listen for output_configurations changes on EP232's UbisysCluster
+        # so the local enum stays in sync when the attribute is read, reported,
+        # or written from outside (e.g. ZHA UI "Manage Clusters").
+        # During initial quirk creation the cluster replacement on EP232 may
+        # not have been applied yet; apply_custom_configuration will register
+        # listeners later in that case.
+        setup = getattr(self.endpoint.device.endpoints.get(232), "ubisys_cluster", None)
+        if setup is not None:
+            self._register_listeners(setup)
+
+    def _register_listeners(self, setup: UbisysCluster) -> None:
+        """Register event listeners on the EP232 UbisysCluster."""
+        if getattr(self, "_listeners_registered", False):
+            return
+        for event_type in (
+            AttributeReadEvent.event_type,
+            AttributeReportedEvent.event_type,
+            AttributeUpdatedEvent.event_type,
+            AttributeWrittenEvent.event_type,
+        ):
+            setup.on_event(event_type, self._handle_output_config_event)
+        self._listeners_registered = True
+
+    def _handle_output_config_event(
+        self,
+        event: (
+            AttributeReadEvent
+            | AttributeReportedEvent
+            | AttributeUpdatedEvent
+            | AttributeWrittenEvent
+        ),
+    ) -> None:
+        """Sync local output_mode when the real attribute changes on EP232."""
+        if event.attribute_id != UbisysCluster.AttributeDefs.output_configurations.id:
+            return
+        if isinstance(event, AttributeWrittenEvent) and event.status != 0:
+            return
+        mode = self._match_output_mode(list(event.value))
+        if mode is not None:
+            self._update_attribute(self.AttributeDefs.output_mode.id, mode)
+        else:
+            _LOGGER.debug(
+                "ubisys LD6: output configuration does not match any known profile"
+            )
+
+    @staticmethod
+    def _match_output_mode(raw_configs: list[bytes]) -> OutputMode | None:
+        """Match raw OutputConfigurations data to a known OutputMode.
+
+        Compares only the first byte (EndpointAndFunction) of each slot,
+        which is sufficient to identify the profile without being sensitive
+        to user-customized chromaticity/flux calibration values.
+        """
+        raw_funcs = [c[0] if c else 0 for c in raw_configs]
+        for mode, ref_configs in OUTPUT_MODE_DATA.items():
+            ref_funcs = [c[0] for c in ref_configs]
+            if raw_funcs == ref_funcs:
+                return mode
+        return None
+
+    async def apply_custom_configuration(self, *args, **kwargs):
+        """Read the device's current output configuration and sync the local enum."""
+        setup = self.endpoint.device.endpoints[232].ubisys_cluster
+
+        # Register listeners if __init__ ran before the cluster replacement
+        self._register_listeners(setup)
+
+        # Read current configuration from the device
+        result = await setup.read_attributes(
+            [UbisysCluster.AttributeDefs.output_configurations]
+        )
+        raw = result[0].get(UbisysCluster.AttributeDefs.output_configurations.name)
+        if raw is not None:
+            mode = self._match_output_mode(list(raw))
+            if mode is not None:
+                self._update_attribute(self.AttributeDefs.output_mode.id, mode)
+            else:
+                _LOGGER.debug(
+                    "ubisys LD6: output configuration does not match any known profile"
+                )
 
     async def write_attributes(
         self,
