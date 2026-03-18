@@ -335,7 +335,7 @@ class UbisysLD6SetupCluster(UbisysCluster):
         config_cluster = self.endpoint.device.endpoints[1].ubisys_ld6_output_config
         mode = _match_output_mode(list(event.value))
         if mode is not None:
-            config_cluster._update_attribute(
+            config_cluster.update_attribute(
                 UbisysLD6OutputConfigCluster.AttributeDefs.output_mode.id, mode
             )
         else:
