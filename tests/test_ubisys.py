@@ -1489,10 +1489,11 @@ async def test_ld6_output_mode_write(ubisys_ld6):
         ubisys_ld6.reinterview.assert_called_once()
 
     # Verify local cache was updated
-    assert (
+    assert len(config_listener.attribute_updates) == 1
+    assert config_listener.attribute_updates[0] == (
         UbisysLD6OutputConfigCluster.AttributeDefs.output_mode.id,
         OutputMode.RGBW_1x,
-    ) in config_listener.attribute_updates
+    )
 
 
 async def test_ld6_output_mode_event_sync(ubisys_ld6):
@@ -1509,10 +1510,11 @@ async def test_ld6_output_mode_event_sync(ubisys_ld6):
     )
 
     # Verify the config cluster was updated
-    assert (
+    assert len(config_listener.attribute_updates) == 1
+    assert config_listener.attribute_updates[0] == (
         UbisysLD6OutputConfigCluster.AttributeDefs.output_mode.id,
         OutputMode.RGBCW_1x,
-    ) in config_listener.attribute_updates
+    )
 
 
 async def test_ld6_output_mode_event_ignores_unknown(ubisys_ld6):
