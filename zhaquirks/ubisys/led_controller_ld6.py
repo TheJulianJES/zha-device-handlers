@@ -336,13 +336,7 @@ class UbisysLD6SetupCluster(UbisysCluster):
             return
         if isinstance(event, AttributeWrittenEvent) and event.status != 0:
             return
-        config_cluster = getattr(
-            self.endpoint.device.endpoints.get(1),
-            UbisysLD6OutputConfigCluster.ep_attribute,
-            None,
-        )
-        if config_cluster is None:
-            return
+        config_cluster = self.endpoint.device.endpoints[1].ubisys_ld6_output_config
         mode = _match_output_mode(list(event.value))
         if mode is not None:
             config_cluster._update_attribute(
