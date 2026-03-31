@@ -70,7 +70,7 @@ class SonoffButtonCluster(CustomCluster):
 
 
 base_quirk = (
-    QuirkBuilder()
+    QuirkBuilder("SONOFF", "SNZB-01M")
     .replaces(SonoffButtonCluster, endpoint_id=1)
     .replaces(SonoffButtonCluster, endpoint_id=2)
     .replaces(SonoffButtonCluster, endpoint_id=3)
@@ -88,8 +88,7 @@ base_quirk = (
 
 # Old firmware
 (
-    base_quirk.clone()
-    .applies_to("SONOFF", "SNZB-01M")
+    base_quirk.clone(omit_man_model_data=False)
     .firmware_version_filter(max_version=0x00001100, allow_missing=True)
     .add_to_registry()
 )
@@ -98,8 +97,7 @@ base_quirk = (
 # Firmware adds these clusters but zigpy doesn't re-interview,
 # so the quirk adds them manually.
 (
-    base_quirk.clone()
-    .applies_to("SONOFF", "SNZB-01M")
+    base_quirk.clone(omit_man_model_data=False)
     .firmware_version_filter(min_version=0x00001100, allow_missing=False)
     .adds(OnOff, endpoint_id=2)
     .adds(OnOff, endpoint_id=3)
