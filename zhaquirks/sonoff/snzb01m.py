@@ -2,6 +2,7 @@
 
 from zigpy.quirks.v2 import QuirkBuilder
 import zigpy.types as t
+from zigpy.zcl.clusters.general import OnOff
 from zigpy.zcl.foundation import BaseAttributeDefs, ZCLAttributeDef
 
 from zhaquirks import CustomCluster
@@ -68,8 +69,8 @@ class SonoffButtonCluster(CustomCluster):
                 self.listener_event(ZHA_SEND_EVENT, action, {})
 
 
-(
-    QuirkBuilder("SONOFF", "SNZB-01M")
+base_quirk = (
+    QuirkBuilder()
     .replaces(SonoffButtonCluster, endpoint_id=1)
     .replaces(SonoffButtonCluster, endpoint_id=2)
     .replaces(SonoffButtonCluster, endpoint_id=3)
@@ -83,5 +84,25 @@ class SonoffButtonCluster(CustomCluster):
             for command, trigger in TRIGGER_MAP.items()
         }
     )
+)
+
+# Old firmware
+(
+    base_quirk.clone()
+    .applies_to("SONOFF", "SNZB-01M")
+    .firmware_version_filter(max_version=0x00001100, allow_missing=True)
+    .add_to_registry()
+)
+
+# New firmware (>= 0x00001100): adds OnOff on endpoints 2-4.
+# Firmware adds these clusters but zigpy doesn't re-interview,
+# so the quirk adds them manually.
+(
+    base_quirk.clone()
+    .applies_to("SONOFF", "SNZB-01M")
+    .firmware_version_filter(min_version=0x00001100, allow_missing=False)
+    .adds(OnOff, endpoint_id=2)
+    .adds(OnOff, endpoint_id=3)
+    .adds(OnOff, endpoint_id=4)
     .add_to_registry()
 )
