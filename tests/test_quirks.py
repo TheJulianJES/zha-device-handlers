@@ -903,8 +903,6 @@ def test_no_duplicate_clusters(quirk: CustomDevice) -> None:
             # adds DoorLock cluster to output clusters (Yale door locks):
             zhaquirks.yale.realliving.YRD210PBDB220TSLL,
             zhaquirks.yale.realliving.YRD220240TSDB,
-            # remove LevelControl input cluster (Adurolight remote):
-            zhaquirks.aduro.adurolightncc.AdurolightNCC,
             # add a bunch of output clusters (Zhongxing motion sensor):
             zhaquirks.zhongxing.motion.SN10ZW,
             # remove Tuya clusters from input and output clusters (ZLinky):
