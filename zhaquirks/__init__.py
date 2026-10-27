@@ -27,6 +27,7 @@ import zigpy.types as t
 from zigpy.typing import UNDEFINED, UndefinedType
 from zigpy.util import ListenableMixin
 from zigpy.zcl import (
+    AttributeClearedEvent,
     AttributeReportedEvent,
     AttributeUnsupportedEvent,
     AttributeUpdatedEvent,
@@ -141,6 +142,88 @@ class LocalDataCluster(CustomCluster):
             ):
                 record.status = foundation.Status.SUCCESS
         return (records,)
+
+    def _process_read_attributes_response(
+        self,
+        result: typing.Any,
+        chunk: list[foundation.ZCLAttributeDef],
+        attribute_map: dict[
+            foundation.ZCLAttributeDef, int | str | foundation.ZCLAttributeDef
+        ],
+        manufacturer_code: int | None,
+        success: dict,
+        failure: dict,
+        *,
+        allow_retry: bool,
+    ) -> list[foundation.ZCLAttributeDef]:
+        """Process a local read, without feeding the values back into the cache.
+
+        zigpy stores every successful read result via `_update_attribute`. For a
+        local cluster, the result already comes from the cache or `_DEFAULT_VALUES`,
+        so that would persist defaults as if the device reported them, and convert
+        values a second time on clusters that convert in `_update_attribute`.
+        """
+        if not isinstance(result[0], list):
+            for attr_def in chunk:
+                failure[attribute_map[attr_def]] = result[0]
+
+            return []
+
+        records = {record.attrid: record for record in result[0]}
+
+        for attr_def in chunk:
+            attribute = attribute_map[attr_def]
+            record = records.get(attr_def.id)
+
+            if record is None:
+                # Omitted from the response. Re-reading it alone can't help for a
+                # local read, so fail it right away
+                failure[attribute] = foundation.Status.INSUFFICIENT_SPACE
+                continue
+
+            if record.status != foundation.Status.SUCCESS:
+                failure[attribute] = record.status
+
+                if record.status == foundation.Status.UNSUPPORTED_ATTRIBUTE:
+                    # Keep marking attributes without a value as unsupported
+                    self._emit_attribute_event(
+                        AttributeUnsupportedEvent, attr_def, manufacturer_code
+                    )
+
+                continue
+
+            value = record.value.value
+            success[attribute] = value if value is None else attr_def.type(value)
+
+            if self._attr_cache.is_unsupported(attr_def):
+                # zigpy drops a stale unsupported mark when caching a read value.
+                # Nothing is cached here, so drop the mark and its persisted entry
+                self._attr_cache.remove_unsupported(attr_def)
+                self._emit_attribute_event(
+                    AttributeClearedEvent, attr_def, manufacturer_code
+                )
+
+        return []
+
+    def _emit_attribute_event(
+        self,
+        event_class: type[AttributeClearedEvent | AttributeUnsupportedEvent],
+        attr_def: foundation.ZCLAttributeDef,
+        manufacturer_code: int | None,
+    ) -> None:
+        """Emit an attribute event without a value."""
+        self.emit(
+            event_class.event_type,
+            event_class(
+                device_ieee=str(self.endpoint.device.ieee),
+                endpoint_id=self.endpoint.endpoint_id,
+                cluster_type=self.cluster_type,
+                cluster_id=self.cluster_id,
+                attribute_name=attr_def.name,
+                attribute_id=attr_def.id,
+                manufacturer_code=manufacturer_code,
+            ),
+        )
 
     def _write_attr_records(self, attributes: dict) -> list[foundation.Attribute]:
         """Convert attributes dict to list of Attribute records."""
