@@ -27,6 +27,7 @@ import zigpy.types as t
 from zigpy.typing import UNDEFINED, UndefinedType
 from zigpy.util import ListenableMixin
 from zigpy.zcl import (
+    AttributeClearedEvent,
     AttributeReportedEvent,
     AttributeUnsupportedEvent,
     AttributeUpdatedEvent,
@@ -141,6 +142,40 @@ class LocalDataCluster(CustomCluster):
             ):
                 record.status = foundation.Status.SUCCESS
         return (records,)
+
+    def _store_read_attribute_value(
+        self,
+        attr_def: foundation.ZCLAttributeDef,
+        value: typing.Any,
+        *,
+        raw_value: typing.Any,
+        manufacturer_code: int | None,
+    ) -> None:
+        """Don't feed local reads back into the attribute cache.
+
+        zigpy stores every successful read result via `_update_attribute`. For a
+        local cluster, the result already comes from the cache or `_DEFAULT_VALUES`,
+        so that would persist defaults as if the device reported them, and convert
+        values a second time on clusters that convert in `_update_attribute`.
+        """
+        if not self._attr_cache.is_unsupported(attr_def):
+            return
+
+        # zigpy drops a stale unsupported mark when caching a read value. Nothing is
+        # cached here, so drop the mark and its persisted entry
+        self._attr_cache.remove_unsupported(attr_def)
+        self.emit(
+            AttributeClearedEvent.event_type,
+            AttributeClearedEvent(
+                device_ieee=str(self.endpoint.device.ieee),
+                endpoint_id=self.endpoint.endpoint_id,
+                cluster_type=self.cluster_type,
+                cluster_id=self.cluster_id,
+                attribute_name=attr_def.name,
+                attribute_id=attr_def.id,
+                manufacturer_code=manufacturer_code,
+            ),
+        )
 
     def _write_attr_records(self, attributes: dict) -> list[foundation.Attribute]:
         """Convert attributes dict to list of Attribute records."""
